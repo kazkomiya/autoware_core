@@ -36,11 +36,11 @@ using COV_IDX_XYZ = autoware_utils_geometry::xyz_covariance_index::XYZ_COV_IDX;
 using COV_IDX_XYZRPY = autoware_utils_geometry::xyzrpy_covariance_index::XYZRPY_COV_IDX;
 
 // Large enough that none of the scenarios below ever trip the message-timeout check.
-constexpr double kHugeTimeoutSec = 1e12;
+constexpr double huge_timeout_sec = 1e12;
 // Small enough that a scenario can deliberately trip it by moving the current time on.
-constexpr double kShortTimeoutSec = 1.0;
+constexpr double short_timeout_sec = 1.0;
 // Must be RCL_ROS_TIME to match the clock the message stamps are read as.
-const rclcpp::Time kNow(100, 0, RCL_ROS_TIME);
+const rclcpp::Time now(100, 0, RCL_ROS_TIME);
 
 builtin_interfaces::msg::Time make_stamp(int32_t sec, uint32_t nanosec)
 {
@@ -84,11 +84,11 @@ TwistWithCovarianceStamped make_vehicle_twist(
 void prime(GyroOdometer & gyro_odometer)
 {
   const auto stamp = make_stamp(100, 0);
-  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), kNow);
+  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), now);
   gyro_odometer.input_imu(
-    make_imu(stamp, "base_link", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), kNow);
+    make_imu(stamp, "base_link", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), now);
   const auto primed =
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), kNow);
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), now);
   EXPECT_TRUE(primed.has_value()) << "priming did not reach a first fusion";
 }
 
@@ -266,7 +266,7 @@ TEST(GyroOdometer, ApplyStopCompensationPreservesAngularWhenTurning)
 // Nothing has been fed in yet, so neither side counts as having arrived.
 TEST(GyroOdometer, NoInputLeavesNeitherSideArrived)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
 
   const GyroOdometer::Status status = gyro_odometer.take_status();
 
@@ -279,13 +279,13 @@ TEST(GyroOdometer, NoInputLeavesNeitherSideArrived)
 // IMU samples alone never fuse, however many arrive.
 TEST(GyroOdometer, ImuAloneNeverFuses)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   const auto stamp = make_stamp(100, 0);
   const Imu imu = make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01);
 
-  EXPECT_FALSE(gyro_odometer.input_imu(imu, kNow).has_value());
-  EXPECT_FALSE(gyro_odometer.input_imu(imu, kNow).has_value());
-  EXPECT_FALSE(gyro_odometer.input_imu(imu, kNow).has_value());
+  EXPECT_FALSE(gyro_odometer.input_imu(imu, now).has_value());
+  EXPECT_FALSE(gyro_odometer.input_imu(imu, now).has_value());
+  EXPECT_FALSE(gyro_odometer.input_imu(imu, now).has_value());
 
   const GyroOdometer::Status status = gyro_odometer.take_status();
   EXPECT_TRUE(status.imu_arrived);
@@ -295,13 +295,13 @@ TEST(GyroOdometer, ImuAloneNeverFuses)
 // Vehicle twists alone never fuse, however many arrive.
 TEST(GyroOdometer, VehicleTwistAloneNeverFuses)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   const auto stamp = make_stamp(100, 0);
   const TwistWithCovarianceStamped twist = make_vehicle_twist(stamp, 1.0, 4.0);
 
-  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, kNow).has_value());
-  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, kNow).has_value());
-  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, kNow).has_value());
+  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, now).has_value());
+  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, now).has_value());
+  EXPECT_FALSE(gyro_odometer.input_vehicle_twist(twist, now).has_value());
 
   const GyroOdometer::Status status = gyro_odometer.take_status();
   EXPECT_TRUE(status.vehicle_twist_arrived);
@@ -312,14 +312,14 @@ TEST(GyroOdometer, VehicleTwistAloneNeverFuses)
 // compensated pair carries them too while the vehicle is moving.
 TEST(GyroOdometer, CompletedPairProducesAllFourMessages)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   const auto stamp = make_stamp(100, 0);
 
-  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), kNow);
+  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), now);
   gyro_odometer.input_imu(
-    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.02, 0.03), kNow);
+    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.02, 0.03), now);
   const auto output =
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), kNow);
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), now);
 
   ASSERT_TRUE(output.has_value());
   const auto & [twist_raw, twist_with_cov_raw, twist, twist_with_cov] = *output;
@@ -347,19 +347,19 @@ TEST(GyroOdometer, CompletedPairProducesAllFourMessages)
 // their mean and the reported variance is their mean variance divided by how many there were.
 TEST(GyroOdometer, AccumulatedVehicleTwistsAreAveragedIntoOneFusion)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   prime(gyro_odometer);
   const auto stamp = make_stamp(100, 0);
 
   EXPECT_FALSE(
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), kNow)
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), now)
       .has_value());
   EXPECT_FALSE(
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 3.0, 4.0), kNow)
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 3.0, 4.0), now)
       .has_value());
 
   const auto output = gyro_odometer.input_imu(
-    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.02, 0.03), kNow);
+    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.02, 0.03), now);
 
   ASSERT_TRUE(output.has_value());
   const auto & fused = std::get<1>(*output);
@@ -376,23 +376,23 @@ TEST(GyroOdometer, AccumulatedVehicleTwistsAreAveragedIntoOneFusion)
 // completes the pair fuses against their mean angular velocity.
 TEST(GyroOdometer, AccumulatedImuSamplesAreAveragedIntoOneFusion)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   prime(gyro_odometer);
   const auto stamp = make_stamp(100, 0);
 
   EXPECT_FALSE(
     gyro_odometer
       .input_imu(
-        make_imu(stamp, "base_link", 0.0, 0.0, 0.2, 0.01, 0.01, 0.01), kNow)
+        make_imu(stamp, "base_link", 0.0, 0.0, 0.2, 0.01, 0.01, 0.01), now)
       .has_value());
   EXPECT_FALSE(
     gyro_odometer
       .input_imu(
-        make_imu(stamp, "base_link", 0.0, 0.0, 0.4, 0.01, 0.01, 0.01), kNow)
+        make_imu(stamp, "base_link", 0.0, 0.0, 0.4, 0.01, 0.01, 0.01), now)
       .has_value());
 
   const auto output =
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), kNow);
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 1.0, 4.0), now);
 
   ASSERT_TRUE(output.has_value());
   const auto & fused = std::get<1>(*output);
@@ -407,13 +407,13 @@ TEST(GyroOdometer, AccumulatedImuSamplesAreAveragedIntoOneFusion)
 // The output carries the later of the two input stamps, whichever side it comes from.
 TEST(GyroOdometer, OutputCarriesTheLaterVehicleTwistStamp)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   prime(gyro_odometer);
 
   gyro_odometer.input_imu(
-    make_imu(make_stamp(98, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(make_stamp(98, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
   const auto output = gyro_odometer.input_vehicle_twist(
-    make_vehicle_twist(make_stamp(99, 0), 1.0, 4.0), kNow);
+    make_vehicle_twist(make_stamp(99, 0), 1.0, 4.0), now);
 
   ASSERT_TRUE(output.has_value());
   EXPECT_EQ(rclcpp::Time(std::get<1>(*output).header.stamp).seconds(), 99.0);
@@ -422,13 +422,13 @@ TEST(GyroOdometer, OutputCarriesTheLaterVehicleTwistStamp)
 // Mirror of the above: this time the IMU sample is the later of the two.
 TEST(GyroOdometer, OutputCarriesTheLaterImuStamp)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   prime(gyro_odometer);
 
   gyro_odometer.input_vehicle_twist(
-    make_vehicle_twist(make_stamp(98, 0), 1.0, 4.0), kNow);
+    make_vehicle_twist(make_stamp(98, 0), 1.0, 4.0), now);
   const auto output = gyro_odometer.input_imu(
-    make_imu(make_stamp(99, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(make_stamp(99, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
 
   ASSERT_TRUE(output.has_value());
   EXPECT_EQ(rclcpp::Time(std::get<1>(*output).header.stamp).seconds(), 99.0);
@@ -438,12 +438,12 @@ TEST(GyroOdometer, OutputCarriesTheLaterImuStamp)
 // age it was judged on is left where the caller can report it.
 TEST(GyroOdometer, VehicleTwistOlderThanToleranceDropsPendingData)
 {
-  GyroOdometer gyro_odometer{kShortTimeoutSec};
+  GyroOdometer gyro_odometer{short_timeout_sec};
   prime(gyro_odometer);
   const rclcpp::Time much_later(105, 0, RCL_ROS_TIME);
 
   gyro_odometer.input_vehicle_twist(
-    make_vehicle_twist(make_stamp(100, 0), 1.0, 4.0), kNow);
+    make_vehicle_twist(make_stamp(100, 0), 1.0, 4.0), now);
   const auto output = gyro_odometer.input_imu(
     make_imu(make_stamp(105, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), much_later);
 
@@ -464,12 +464,12 @@ TEST(GyroOdometer, VehicleTwistOlderThanToleranceDropsPendingData)
 // Mirror of the above: this time the IMU sample is the one older than the tolerance.
 TEST(GyroOdometer, ImuOlderThanToleranceDropsPendingData)
 {
-  GyroOdometer gyro_odometer{kShortTimeoutSec};
+  GyroOdometer gyro_odometer{short_timeout_sec};
   prime(gyro_odometer);
   const rclcpp::Time much_later(105, 0, RCL_ROS_TIME);
 
   gyro_odometer.input_imu(
-    make_imu(make_stamp(100, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(make_stamp(100, 0), "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
   const auto output = gyro_odometer.input_vehicle_twist(
     make_vehicle_twist(make_stamp(105, 0), 1.0, 4.0), much_later);
 
@@ -483,21 +483,21 @@ TEST(GyroOdometer, ImuOlderThanToleranceDropsPendingData)
 // pending on either side with it.
 TEST(GyroOdometer, DiscardedImuDropsPendingData)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   prime(gyro_odometer);
   const auto stamp = make_stamp(100, 0);
 
-  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 99.0, 4.0), kNow);
+  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 99.0, 4.0), now);
   gyro_odometer.discard_unusable_imu(
-    make_imu(stamp, "imu_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(stamp, "imu_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
 
   // The discarded sample still counts as the IMU side having been heard from.
   EXPECT_TRUE(gyro_odometer.take_status().imu_arrived);
 
   // What was pending did not survive: a fresh pair fuses from its own values alone.
-  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 5.0, 4.0), kNow);
+  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 5.0, 4.0), now);
   const auto output = gyro_odometer.input_imu(
-    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(stamp, "base_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
 
   ASSERT_TRUE(output.has_value());
   EXPECT_DOUBLE_EQ(std::get<1>(*output).twist.twist.linear.x, 5.0);
@@ -507,10 +507,10 @@ TEST(GyroOdometer, DiscardedImuDropsPendingData)
 // alone: there is no stamp yet to measure one against.
 TEST(GyroOdometer, DiscardedImuBeforeAnyVehicleTwistLeavesItsAgeAlone)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
 
   gyro_odometer.discard_unusable_imu(
-    make_imu(make_stamp(100, 0), "imu_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), kNow);
+    make_imu(make_stamp(100, 0), "imu_link", 0.1, 0.2, 0.3, 0.01, 0.01, 0.01), now);
 
   const GyroOdometer::Status status = gyro_odometer.take_status();
   EXPECT_TRUE(status.imu_arrived);
@@ -522,14 +522,14 @@ TEST(GyroOdometer, DiscardedImuBeforeAnyVehicleTwistLeavesItsAgeAlone)
 // the IMU measured.
 TEST(GyroOdometer, StandstillClearsAngularVelocityInTheCompensatedOutput)
 {
-  GyroOdometer gyro_odometer{kHugeTimeoutSec};
+  GyroOdometer gyro_odometer{huge_timeout_sec};
   const auto stamp = make_stamp(100, 0);
 
-  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), kNow);
+  gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 0.0), now);
   gyro_odometer.input_imu(
-    make_imu(stamp, "base_link", 0.5, 0.6, 0.0, 0.01, 0.01, 0.01), kNow);
+    make_imu(stamp, "base_link", 0.5, 0.6, 0.0, 0.01, 0.01, 0.01), now);
   const auto output =
-    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 4.0), kNow);
+    gyro_odometer.input_vehicle_twist(make_vehicle_twist(stamp, 0.0, 4.0), now);
 
   ASSERT_TRUE(output.has_value());
   const auto & [twist_raw, twist_with_cov_raw, twist, twist_with_cov] = *output;
