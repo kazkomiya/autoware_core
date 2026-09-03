@@ -23,6 +23,15 @@
 
 namespace autoware::gyro_odometer
 {
+namespace
+{
+geometry_msgs::msg::TwistWithCovarianceStamped fuse_twist(
+  const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped> & vehicle_twist_queue,
+  const std::deque<sensor_msgs::msg::Imu> & gyro_queue);
+
+geometry_msgs::msg::TwistWithCovarianceStamped apply_stop_compensation(
+  const geometry_msgs::msg::TwistWithCovarianceStamped & twist_with_cov);
+}  // namespace
 
 GyroOdometer::GyroOdometer(double message_timeout_sec) : message_timeout_sec_(message_timeout_sec)
 {
@@ -155,20 +164,8 @@ GyroOdometer::OutputData GyroOdometer::make_output(
   return OutputData{twist_raw, twist_with_cov_raw, twist, twist_with_covariance};
 }
 
-std::array<double, 9> transform_covariance(const std::array<double, 9> & cov)
+namespace
 {
-  using COV_IDX = autoware_utils_geometry::xyz_covariance_index::XYZ_COV_IDX;
-
-  double max_cov = std::max({cov[COV_IDX::X_X], cov[COV_IDX::Y_Y], cov[COV_IDX::Z_Z]});
-
-  std::array<double, 9> cov_transformed = {};
-  cov_transformed.fill(0.);
-  cov_transformed[COV_IDX::X_X] = max_cov;
-  cov_transformed[COV_IDX::Y_Y] = max_cov;
-  cov_transformed[COV_IDX::Z_Z] = max_cov;
-  return cov_transformed;
-}
-
 geometry_msgs::msg::TwistWithCovarianceStamped fuse_twist(
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped> & vehicle_twist_queue,
   const std::deque<sensor_msgs::msg::Imu> & gyro_queue)
@@ -248,5 +245,7 @@ geometry_msgs::msg::TwistWithCovarianceStamped apply_stop_compensation(
 
   return result;
 }
+
+}  // namespace
 
 }  // namespace autoware::gyro_odometer

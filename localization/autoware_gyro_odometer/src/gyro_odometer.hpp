@@ -21,7 +21,6 @@
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
-#include <array>
 #include <cstdint>
 #include <deque>
 #include <optional>
@@ -77,8 +76,8 @@ public:
   std::optional<OutputData> input_vehicle_twist(
     const geometry_msgs::msg::TwistWithCovarianceStamped & vehicle_twist_msg);
 
-  /// \brief Queue \p imu_msg, which must already be expressed in the output frame, and attempt a
-  /// fusion.
+  /// \brief Queue \p imu_msg, which must already be expressed in the output frame with its
+  /// angular-velocity covariance reduced to an isotropic bound, and attempt a fusion.
   /// \return the fused output if this call completed a fusion, std::nullopt otherwise.
   std::optional<OutputData> input_imu(const sensor_msgs::msg::Imu & imu_msg);
 
@@ -103,33 +102,6 @@ private:
   std::deque<geometry_msgs::msg::TwistWithCovarianceStamped> vehicle_twist_queue_;
   std::deque<sensor_msgs::msg::Imu> gyro_queue_;
 };
-
-/// \brief Reduce an angular-velocity covariance (xyz layout) to an isotropic diagonal covariance.
-///
-/// The maximum of the three diagonal terms (X_X, Y_Y, Z_Z) is written to all three diagonal
-/// terms; every off-diagonal term is zeroed. Pure function: output depends only on the input.
-std::array<double, 9> transform_covariance(const std::array<double, 9> & cov);
-
-/// \brief Fuse the vehicle-twist queue and the (already gyro-frame-transformed) IMU queue into a
-/// single twist with covariance.
-///
-/// Computes the per-queue means and the statistically reduced covariances, and selects the output
-/// header stamp as the later of the latest vehicle-twist and latest IMU stamps. The IMU queue must
-/// already be transformed into the output frame (its covariances reduced via transform_covariance).
-/// Both queues must be non-empty; emptiness is the caller's responsibility to check.
-///
-/// Pure function: it reads the queues and produces an output message without touching any node
-/// state, the clock, TF, or publishers.
-geometry_msgs::msg::TwistWithCovarianceStamped fuse_twist(
-  const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped> & vehicle_twist_queue,
-  const std::deque<sensor_msgs::msg::Imu> & gyro_queue);
-
-/// \brief Clear the IMU-derived angular velocity when the vehicle is judged to be stopped.
-///
-/// When both |angular.z| and |linear.x| are below 0.01, all three angular components are zeroed;
-/// otherwise the input is returned unchanged. Pure function returning a new message.
-geometry_msgs::msg::TwistWithCovarianceStamped apply_stop_compensation(
-  const geometry_msgs::msg::TwistWithCovarianceStamped & twist_with_cov);
 
 }  // namespace autoware::gyro_odometer
 
